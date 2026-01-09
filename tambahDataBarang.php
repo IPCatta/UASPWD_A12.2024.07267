@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $harga_clean = str_replace(['.', ','], '', $harga_raw);
     $harga = (float) $harga_clean;
     $deskripsi  = trim($_POST['deskripsi'] ?? '');
-
+    
     // Validasi sederhana
     if ($nama_barang === '' || $kategori === '') {
         $_SESSION['pesan'] = "Nama barang dan kategori wajib diisi.";
@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['pesan'] = "Stok dan harga tidak boleh negatif.";
         $_SESSION['tipe']  = "error";
     } else {
-        // Generate kode otomatis jika kosong
+    // Generate kode otomatis jika kosong
         if ($kode_barang === '') {
             $prefix = 'BRG';
             $sqlMax = "SELECT MAX(CAST(SUBSTRING(kode_barang, 4) AS UNSIGNED)) AS max_code 
@@ -44,15 +44,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $rowMax = $resMax ? mysqli_fetch_assoc($resMax) : null;
             $next   = ($rowMax['max_code'] ?? 0) + 1;
             $kode_barang = $prefix . str_pad($next, 3, '0', STR_PAD_LEFT);
-        }
-
+    }
+    
         // Cek kode unik
         $kode_esc = mysqli_real_escape_string($koneksi, $kode_barang);
         $cek = mysqli_query($koneksi, "SELECT id FROM barang WHERE kode_barang = '$kode_esc'");
         if ($cek && mysqli_num_rows($cek) > 0) {
             $_SESSION['pesan'] = "Kode barang '$kode_barang' sudah digunakan.";
             $_SESSION['tipe']  = "error";
-        } else {
+    } else {
             // Insert sederhana
             $nama_esc = mysqli_real_escape_string($koneksi, $nama_barang);
             $kat_esc  = mysqli_real_escape_string($koneksi, $kategori);
@@ -60,13 +60,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $sql = "INSERT INTO barang (kode_barang, nama_barang, kategori, stok, harga, deskripsi, status)
                     VALUES ('$kode_esc', '$nama_esc', '$kat_esc', $stok, $harga, '$desk_esc', 'aktif')";
-
+        
             if (mysqli_query($koneksi, $sql)) {
                 $_SESSION['pesan'] = "Barang berhasil ditambahkan.";
                 $_SESSION['tipe']  = "success";
                 header("Location: tampilDataBarang.php");
                 exit;
-            } else {
+        } else {
                 $_SESSION['pesan'] = "Gagal menambahkan barang.";
                 $_SESSION['tipe']  = "error";
             }
