@@ -6,6 +6,27 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// #region agent log
+if (!function_exists('agent_debug_log_87fe35')) {
+    function agent_debug_log_87fe35(string $hypothesisId, string $message, array $data = []): void {
+        $payload = [
+            'sessionId' => '87fe35',
+            'runId' => 'pre-fix',
+            'hypothesisId' => $hypothesisId,
+            'location' => 'tambahDataBarang.php',
+            'message' => $message,
+            'data' => $data,
+            'timestamp' => (int) floor(microtime(true) * 1000),
+        ];
+        @file_put_contents(__DIR__ . DIRECTORY_SEPARATOR . 'debug-87fe35.log', json_encode($payload, JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
+    }
+}
+agent_debug_log_87fe35('D', 'page entry', [
+    'method' => $_SERVER['REQUEST_METHOD'] ?? null,
+    'logged_in' => isset($_SESSION['user_logged_in']) && $_SESSION['user_logged_in'] === true,
+]);
+// #endregion
+
 // Cek apakah user sudah login
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true) {
     header("Location: login.php");
@@ -13,6 +34,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 }
 
 require_once 'koneksi.php';
+require_once __DIR__ . '/lib/upload_foto_barang.php';
 
 $page_title = "Tambah Barang";
 
@@ -26,6 +48,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $harga_clean = str_replace(['.', ','], '', $harga_raw);
     $harga = (float) $harga_clean;
     $deskripsi  = trim($_POST['deskripsi'] ?? '');
+
+    // #region agent log
+    agent_debug_log_87fe35('D', 'post parsed', [
+        'kode_barang_len' => strlen($kode_barang),
+        'nama_barang_len' => strlen($nama_barang),
+        'kategori' => $kategori,
+        'stok' => $stok,
+        'harga_raw_len' => strlen($harga_raw),
+        'harga_clean' => preg_replace('/\D/', '', $harga_clean),
+        'harga_num' => $harga,
+        'deskripsi_len' => strlen($deskripsi),
+    ]);
+    // #endregion
     
     // Validasi sederhana
     if ($nama_barang === '' || $kategori === '') {
@@ -58,17 +93,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $kat_esc  = mysqli_real_escape_string($koneksi, $kategori);
             $desk_esc = mysqli_real_escape_string($koneksi, $deskripsi);
 
-            $sql = "INSERT INTO barang (kode_barang, nama_barang, kategori, stok, harga, deskripsi, status)
-                    VALUES ('$kode_esc', '$nama_esc', '$kat_esc', $stok, $harga, '$desk_esc', 'aktif')";
+            $foto_path = null;
+            $upload_ok = true;
+            if (isset($_FILES['foto'])) {
+                $up = barang_upload_foto(
+                    $_FILES['foto'],
+                    __DIR__ . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'barang',
+                    'uploads/barang',
+                    3145728
+                );
+                if (!$up['ok']) {
+                    $_SESSION['pesan'] = $up['error'] ?? 'Upload foto gagal.';
+                    $_SESSION['tipe']  = "error";
+                    $upload_ok = false;
+                } else {
+                    $foto_path = $up['path'] ?? null;
+                }
+            }
+
+            if ($upload_ok) {
+                $foto_esc = $foto_path !== null ? ("'" . mysqli_real_escape_string($koneksi, $foto_path) . "'") : "NULL";
+                $sql = "INSERT INTO barang (kode_barang, nama_barang, kategori, stok, harga, deskripsi, foto, status)
+                        VALUES ('$kode_esc', '$nama_esc', '$kat_esc', $stok, $harga, '$desk_esc', $foto_esc, 'aktif')";
         
-            if (mysqli_query($koneksi, $sql)) {
+                if (mysqli_query($koneksi, $sql)) {
+                // #region agent log
+                agent_debug_log_87fe35('D', 'insert success', [
+                    'kode_barang' => $kode_barang,
+                ]);
+                // #endregion
                 $_SESSION['pesan'] = "Barang berhasil ditambahkan.";
                 $_SESSION['tipe']  = "success";
                 header("Location: tampilDataBarang.php");
                 exit;
-        } else {
+                } else {
+                // #region agent log
+                agent_debug_log_87fe35('D', 'insert failed', [
+                    'mysqli_errno' => function_exists('mysqli_errno') ? @mysqli_errno($koneksi) : null,
+                    'mysqli_error' => function_exists('mysqli_error') ? substr((string) @mysqli_error($koneksi), 0, 180) : null,
+                ]);
+                // #endregion
                 $_SESSION['pesan'] = "Gagal menambahkan barang.";
                 $_SESSION['tipe']  = "error";
+                if ($foto_path) {
+                    barang_delete_foto($foto_path, __DIR__ . DIRECTORY_SEPARATOR . 'uploads');
+                }
+                }
             }
         }
     }
@@ -117,19 +187,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
                 
                 <div class="card-body">
-                    <form method="POST" class="form-vertical" id="form-tambah-barang" onsubmit="return validateForm()">
+                    <form method="POST" enctype="multipart/form-data" class="form-vertical" id="form-tambah-barang" onsubmit="return validateForm()">
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="kode_barang">
                                     <i class="fas fa-barcode"></i> Kode Barang
                                 </label>
                                 <input type="text" id="kode_barang" name="kode_barang" 
-                                       placeholder="Kosongkan untuk generate otomatis" 
+                                       placeholder="masukkan kode barang" 
                                        pattern="[A-Z]{3}[0-9]{3}" 
                                        title="Format: 3 huruf besar diikuti 3 angka (contoh: BRG001)">
-                                <small class="form-hint">
-                                    <i class="fas fa-info-circle"></i> Kosongkan untuk generate otomatis atau isi dengan format BRG001
-                                </small>
                             </div>
                             
                             <div class="form-group">
@@ -191,6 +258,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                       maxlength="500"></textarea>
                             <small class="form-hint">
                                 <span id="char-count">0</span> / 500 karakter
+                            </small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="foto">
+                                <i class="fas fa-image"></i> Foto Barang
+                            </label>
+                            <input type="file" id="foto" name="foto" accept="image/*">
+                            <small class="form-hint">
+                                <i class="fas fa-info-circle"></i> JPG/PNG/WEBP, maks 3MB
                             </small>
                         </div>
                         
@@ -585,6 +662,10 @@ function validateForm() {
     const hargaInput = document.getElementById('harga');
     const hargaRaw = hargaInput.value.replace(/[^\d]/g, '');
     const harga = parseFloat(hargaRaw) || 0;
+
+    // #region agent log
+    fetch('http://127.0.0.1:7559/ingest/fe6a0308-503b-4691-ae8d-159051ea0d4f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'87fe35'},body:JSON.stringify({sessionId:'87fe35',runId:'pre-fix',hypothesisId:'D',location:'tambahDataBarang.php:validateForm',message:'client parsed fields',data:{namaLen:namaBarang?namaBarang.length:0,kategori:kategori||null,stok:isNaN(stok)?null:stok,hargaRawLen:hargaRaw?hargaRaw.length:0,harga:harga},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     
     // Update hidden input atau langsung set value tanpa format
     hargaInput.value = harga;

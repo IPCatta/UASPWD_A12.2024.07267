@@ -7,6 +7,29 @@ if (!isset($koneksi)) {
     }
 }
 
+// #region agent log
+if (!function_exists('agent_debug_log_87fe35')) {
+    function agent_debug_log_87fe35(string $hypothesisId, string $message, array $data = []): void {
+        $payload = [
+            'sessionId' => '87fe35',
+            'runId' => 'pre-fix',
+            'hypothesisId' => $hypothesisId,
+            'location' => 'bingkai/menu.php',
+            'message' => $message,
+            'data' => $data,
+            'timestamp' => (int) floor(microtime(true) * 1000),
+        ];
+        @file_put_contents(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'debug-87fe35.log', json_encode($payload, JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
+    }
+}
+agent_debug_log_87fe35('A', 'menu.php included', [
+    'php_self' => $_SERVER['PHP_SELF'] ?? null,
+    'has_koneksi' => isset($koneksi) && (bool) $koneksi,
+    'session_status' => function_exists('session_status') ? session_status() : null,
+    'has_session' => isset($_SESSION),
+]);
+// #endregion
+
 // Deteksi halaman aktif
 $current_page = basename($_SERVER['PHP_SELF']);
 $current_query = isset($_GET['page']) ? $_GET['page'] : '';
@@ -50,13 +73,6 @@ function isActive($page, $query = '') {
                 </div>
             </div>
             <div class="stat-item">
-                <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                    <i class="fas fa-cubes"></i>
-                </div>
-                <div class="stat-info">
-                    <div class="stat-value" id="stat-total-stok">-</div>
-                    <div class="stat-label">Total Stok</div>
-                </div>
             </div>
         </div>
         
@@ -510,6 +526,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.getElementById('sidebar-menu');
     const toggle = document.getElementById('sidebar-toggle');
     const contentWrapper = document.querySelector('.content-wrapper');
+
+    // #region agent log
+    fetch('http://127.0.0.1:7559/ingest/fe6a0308-503b-4691-ae8d-159051ea0d4f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'87fe35'},body:JSON.stringify({sessionId:'87fe35',runId:'pre-fix',hypothesisId:'A',location:'bingkai/menu.php:DOMContentLoaded',message:'sidebar init',data:{hasSidebar:!!sidebar,hasToggle:!!toggle,hasContentWrapper:!!contentWrapper,hasTotalBarangEl:!!document.getElementById('stat-total-barang'),hasTotalStokEl:!!document.getElementById('stat-total-stok')},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     
     if (toggle) {
         toggle.addEventListener('click', function() {
@@ -533,6 +553,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load statistics (jika ada koneksi database)
     <?php if (isset($koneksi)): ?>
+    // #region agent log
+    fetch('http://127.0.0.1:7559/ingest/fe6a0308-503b-4691-ae8d-159051ea0d4f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'87fe35'},body:JSON.stringify({sessionId:'87fe35',runId:'pre-fix',hypothesisId:'B',location:'bingkai/menu.php:beforeLoadStatistics',message:'calling loadStatistics()',data:{endpoint:'get_statistics.php',hasTotalBarangEl:!!document.getElementById('stat-total-barang'),hasTotalStokEl:!!document.getElementById('stat-total-stok')},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     loadStatistics();
     <?php endif; ?>
 });
@@ -544,6 +567,9 @@ function loadStatistics() {
     fetch('get_statistics.php')
         .then(response => response.json())
         .then(data => {
+            // #region agent log
+            fetch('http://127.0.0.1:7559/ingest/fe6a0308-503b-4691-ae8d-159051ea0d4f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'87fe35'},body:JSON.stringify({sessionId:'87fe35',runId:'pre-fix',hypothesisId:'B',location:'bingkai/menu.php:loadStatistics:then',message:'statistics json parsed',data:{hasTotalBarangEl:!!document.getElementById('stat-total-barang'),hasTotalStokEl:!!document.getElementById('stat-total-stok'),keys:data?Object.keys(data):null},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             if (data.total_barang !== undefined) {
                 document.getElementById('stat-total-barang').textContent = data.total_barang;
             }
@@ -552,6 +578,9 @@ function loadStatistics() {
             }
         })
         .catch(error => {
+            // #region agent log
+            fetch('http://127.0.0.1:7559/ingest/fe6a0308-503b-4691-ae8d-159051ea0d4f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'87fe35'},body:JSON.stringify({sessionId:'87fe35',runId:'pre-fix',hypothesisId:'B',location:'bingkai/menu.php:loadStatistics:catch',message:'statistics fetch/json failed',data:{errorName:error&&error.name?error.name:null,errorMessage:error&&error.message?String(error.message).slice(0,180):null,hasTotalBarangEl:!!document.getElementById('stat-total-barang'),hasTotalStokEl:!!document.getElementById('stat-total-stok')},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             console.log('Statistik tidak dapat dimuat');
             // Set default values
             document.getElementById('stat-total-barang').textContent = '0';

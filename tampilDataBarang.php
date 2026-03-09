@@ -201,6 +201,7 @@ while ($cat_row = mysqli_fetch_assoc($cat_result)) {
                                 <thead>
                                     <tr>
                                         <th>No</th>
+                                        <th>Foto</th>
                                         <th>Kode Barang</th>
                                         <th>Nama Barang</th>
                                         <th>Kategori</th>
@@ -219,6 +220,13 @@ while ($cat_row = mysqli_fetch_assoc($cat_result)) {
                                     ?>
                                         <tr>
                                             <td><?php echo $no++; ?></td>
+                                            <td>
+                                                <?php if (!empty($row['foto'])): ?>
+                                                    <img src="<?php echo htmlspecialchars($row['foto']); ?>" alt="Foto" style="width: 48px; height: 48px; object-fit: cover; border-radius: 10px; border: 2px solid #e0e0e0;">
+                                                <?php else: ?>
+                                                    <span style="color:#999;">-</span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td>
                                                 <span class="badge badge-primary">
                                                     <i class="fas fa-barcode"></i> <?php echo htmlspecialchars($row['kode_barang']); ?>

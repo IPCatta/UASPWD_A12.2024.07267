@@ -13,6 +13,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true)
 }
 
 require_once 'koneksi.php';
+require_once __DIR__ . '/lib/upload_foto_barang.php';
 
 $page_title = "Edit Barang";
 
@@ -68,24 +69,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $desk_esc = mysqli_real_escape_string($koneksi, $deskripsi);
             $sts_esc  = mysqli_real_escape_string($koneksi, $status);
 
-            $sql = "UPDATE barang SET
-                        kode_barang = '$kode_esc',
-                        nama_barang = '$nama_esc',
-                        kategori    = '$kat_esc',
-                        stok        = $stok,
-                        harga       = $harga,
-                        deskripsi   = '$desk_esc',
-                        status      = '$sts_esc'
-                    WHERE id = $id";
+            $foto_set = "";
+            $foto_baru_path = null;
+            $upload_ok = true;
+            if (isset($_FILES['foto'])) {
+                $up = barang_upload_foto(
+                    $_FILES['foto'],
+                    __DIR__ . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'barang',
+                    'uploads/barang',
+                    3145728
+                );
+                if (!$up['ok']) {
+                    $_SESSION['pesan'] = $up['error'] ?? 'Upload foto gagal.';
+                    $_SESSION['tipe']  = "error";
+                    $upload_ok = false;
+                } else {
+                    $foto_baru_path = $up['path'] ?? null;
+                    if ($foto_baru_path !== null) {
+                        $foto_baru_esc = mysqli_real_escape_string($koneksi, $foto_baru_path);
+                        $foto_set = ", foto = '$foto_baru_esc'";
+                    }
+                }
+            }
 
-            if (mysqli_query($koneksi, $sql)) {
-                $_SESSION['pesan'] = "Barang berhasil diperbarui.";
-                $_SESSION['tipe']  = "success";
-                header("Location: tampilDataBarang.php");
-                exit;
-            } else {
-                $_SESSION['pesan'] = "Gagal memperbarui barang.";
-                $_SESSION['tipe']  = "error";
+            if ($upload_ok) {
+                $sql = "UPDATE barang SET
+                            kode_barang = '$kode_esc',
+                            nama_barang = '$nama_esc',
+                            kategori    = '$kat_esc',
+                            stok        = $stok,
+                            harga       = $harga,
+                            deskripsi   = '$desk_esc',
+                            status      = '$sts_esc'
+                            $foto_set
+                        WHERE id = $id";
+
+                if (mysqli_query($koneksi, $sql)) {
+                    $_SESSION['pesan'] = "Barang berhasil diperbarui.";
+                    $_SESSION['tipe']  = "success";
+                    if ($foto_baru_path !== null) {
+                        barang_delete_foto($barang['foto'] ?? null, __DIR__ . DIRECTORY_SEPARATOR . 'uploads');
+                    }
+                    header("Location: tampilDataBarang.php");
+                    exit;
+                } else {
+                    $_SESSION['pesan'] = "Gagal memperbarui barang.";
+                    $_SESSION['tipe']  = "error";
+                    if ($foto_baru_path !== null) {
+                        barang_delete_foto($foto_baru_path, __DIR__ . DIRECTORY_SEPARATOR . 'uploads');
+                    }
+                }
             }
         }
     }
@@ -138,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
                 
                 <div class="card-body">
-                    <form method="POST" class="form-vertical" id="form-edit-barang" onsubmit="return validateForm()">
+                    <form method="POST" enctype="multipart/form-data" class="form-vertical" id="form-edit-barang" onsubmit="return validateForm()">
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="kode_barang">
@@ -218,6 +251,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                       maxlength="500"><?php echo htmlspecialchars($barang['deskripsi']); ?></textarea>
                             <small class="form-hint">
                                 <span id="char-count"><?php echo strlen($barang['deskripsi']); ?></span> / 500 karakter
+                            </small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <i class="fas fa-image"></i> Foto Barang
+                            </label>
+                            <?php if (!empty($barang['foto'])): ?>
+                                <div style="margin: 6px 0 10px;">
+                                    <img src="<?php echo htmlspecialchars($barang['foto']); ?>" alt="Foto Barang" style="max-width: 220px; max-height: 220px; border-radius: 10px; border: 2px solid #e0e0e0;">
+                                </div>
+                            <?php else: ?>
+                                <small class="form-hint">Belum ada foto.</small>
+                            <?php endif; ?>
+                            <input type="file" id="foto" name="foto" accept="image/*">
+                            <small class="form-hint">
+                                <i class="fas fa-info-circle"></i> Jika dipilih, foto lama akan diganti. JPG/PNG/WEBP, maks 3MB
                             </small>
                         </div>
                         
